@@ -1,0 +1,11 @@
+{
+  "name": "media-extractor",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.44.0"
+  },
+  "scripts": {
+    "start": "vercel dev"
+  }
+}

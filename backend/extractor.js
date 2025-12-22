@@ -1,64 +1,67 @@
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 
-async function extractStream(targetUrl) {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-
-  const detectedStreams = new Map();
-
-  function detectStream(url) {
-    const lower = url.toLowerCase();
-
-    if (lower.includes('.m3u8')) return 'HLS (.m3u8)';
-    if (lower.includes('.mp4')) return 'MP4 (.mp4)';
-    if (lower.includes('.webm')) return 'WEBM (.webm)';
-    if (lower.includes('.mpd')) return 'DASH / DRM (.mpd)';
-
-    return null;
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  page.on('request', request => {
-    const url = request.url();
-    const type = detectStream(url);
+  const { url } = req.body;
+  if (!url || !/^https?:\/\/.+/.test(url)) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
 
-    if (!type) return;
-
-    if (!detectedStreams.has(url)) {
-      detectedStreams.set(url, type);
-      console.log(`🎯 Detected ${type}: ${url}`);
-    }
-  });
-
+  let browser;
   try {
-    await page.goto(targetUrl, {
-      waitUntil: 'networkidle',
-      timeout: 30000
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+    const links = await page.evaluate(() => {
+      const seen = new Set();
+      const result = [];
+
+      // Detect <video> tags and <source>
+      document.querySelectorAll('video').forEach(video => {
+        if (video.src && !seen.has(video.src)) {
+          seen.add(video.src);
+          result.push(video.src);
+        }
+        video.querySelectorAll('source').forEach(source => {
+          if (source.src && !seen.has(source.src)) {
+            seen.add(source.src);
+            result.push(source.src);
+          }
+        });
+      });
+
+      // Detect network requests via performance API
+      const xhrLinks = Array.from(window.performance.getEntriesByType('resource'))
+        .map(r => r.name)
+        .filter(n => n.match(/\.(m3u8|mp4|webm|mpd)(\?|$)/i));
+
+      xhrLinks.forEach(l => {
+        if (!seen.has(l)) {
+          seen.add(l);
+          result.push(l);
+        }
+      });
+
+      return result;
     });
 
-    // Try to trigger video playback
-    await page.evaluate(() => {
-      const video = document.querySelector('video');
-      if (video) {
-        video.muted = true;
-        video.play().catch(() => {});
-      }
-    });
+    await browser.close();
 
-    // Wait a bit for streams to load
-    await page.waitForTimeout(5000);
+    if (!links.length) {
+      return res.status(200).json({ message: 'No media links found on this page.' });
+    }
+
+    return res.status(200).json({ links });
+
   } catch (err) {
-    console.error('❌ Page error:', err.message);
+    if (browser) await browser.close();
+    console.error(err);
+    return res.status(500).json({ error: 'Extraction failed.', details: err.message });
   }
-
-  await browser.close();
-
-  return {
-    found: detectedStreams.size > 0,
-    streams: Array.from(detectedStreams.entries()).map(([url, type]) => ({
-      url,
-      type
-    }))
-  };
 }
-
-module.exports = extractStream;
