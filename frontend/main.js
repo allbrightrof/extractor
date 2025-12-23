@@ -10,7 +10,7 @@ document.getElementById('extractBtn').onclick = async () => {
   resultDiv.textContent = '⏳ Extracting...';
 
   try {
-    const response = await fetch('http://localhost:3000/extract', {
+    const response = await fetch('https://extractor-llap.onrender.com/extract', { // updated URL
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
