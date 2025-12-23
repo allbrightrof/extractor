@@ -1,30 +1,30 @@
-document.getElementById('extractBtn').onclick = async () => {
-  const url = document.getElementById('urlInput').value.trim();
-  const resultDiv = document.getElementById('result');
+const btn = document.getElementById("extractBtn");
+const input = document.getElementById("urlInput");
+const output = document.getElementById("output");
+
+btn.onclick = async () => {
+  const url = input.value.trim();
 
   if (!url) {
-    resultDiv.textContent = 'Please enter a valid URL.';
+    output.textContent = "❌ Please enter a URL";
     return;
   }
 
-  resultDiv.textContent = '⏳ Extracting...';
+  output.textContent = "⏳ Extracting...";
 
   try {
-    const response = await fetch('http://localhost:3000/extract', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
+    const res = await fetch(
+      "https://extractor-llap.onrender.com/extract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      }
+    );
 
-    const data = await response.json();
-
-    if (data.m3u8) {
-      resultDiv.textContent = '✅ M3U8 Found: ' + data.m3u8;
-      navigator.clipboard.writeText(data.m3u8).catch(() => {});
-    } else {
-      resultDiv.textContent = '❌ ' + data.error;
-    }
-  } catch (e) {
-    resultDiv.textContent = '❌ Extraction failed: ' + e.message;
+    const data = await res.json();
+    output.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    output.textContent = "❌ Request failed";
   }
 };
