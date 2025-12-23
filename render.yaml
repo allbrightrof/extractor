@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: backend
+    env: node
+    plan: free
+    repo: https://github.com/allbrightrof/extractor
+    branch: main
+    rootDir: backend
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+
+  - type: web
+    name: frontend
+    env: node
+    plan: free
+    repo: https://github.com/allbrightrof/extractor
+    branch: main
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm run start"
