@@ -1,48 +1,32 @@
-const extractBtn = document.getElementById('extract-btn');
-const urlInput = document.getElementById('url-input');
-const linksContainer = document.getElementById('links-container');
+async function extract() {
+  const url = document.getElementById('urlInput').value.trim();
+  const output = document.getElementById('output');
 
-function createLinkEntry(url) {
-  const div = document.createElement('div');
-  div.className = 'url-entry';
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.textContent = url;
-  a.target = '_blank';
-  
-  const copyBtn = document.createElement('button');
-  copyBtn.textContent = '📋 Copy';
-  copyBtn.onclick = () => {
-    navigator.clipboard.writeText(url).then(() => alert('Copied!'));
-  };
+  if (!url) {
+    output.textContent = '❌ Please enter a URL';
+    return;
+  }
 
-  div.appendChild(a);
-  div.appendChild(copyBtn);
-  return div;
-}
+  output.textContent = '⏳ Extracting...';
 
-extractBtn.onclick = async () => {
-  linksContainer.innerHTML = 'Extracting...';
   try {
-    const response = await fetch('/api/extract', {
+    const res = await fetch('/api/extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: urlInput.value })
+      body: JSON.stringify({ url }),
     });
 
-    const data = await response.json();
-    linksContainer.innerHTML = '';
+    const data = await res.json();
 
-    if (data.links && data.links.length > 0) {
-      data.links.forEach(link => {
-        linksContainer.appendChild(createLinkEntry(link));
-      });
-    } else {
-      linksContainer.textContent = data.message || data.error || 'No links found';
+    if (!data.success) {
+      output.textContent = `❌ ${data.message || data.error}`;
+      return;
     }
+
+    output.textContent =
+      `✅ Found ${data.count} link(s):\n\n` +
+      data.links.join('\n');
   } catch (err) {
-    linksContainer.textContent = 'Extraction failed';
-    console.error(err);
+    output.textContent = '❌ Request failed';
   }
-};
+}

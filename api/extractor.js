@@ -1,67 +1,57 @@
-import { chromium } from 'playwright';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Only POST allowed' });
   }
 
   const { url } = req.body;
-  if (!url || !/^https?:\/\/.+/.test(url)) {
+
+  if (!url || !url.startsWith('http')) {
     return res.status(400).json({ error: 'Invalid URL' });
   }
 
-  let browser;
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    const links = await page.evaluate(() => {
-      const seen = new Set();
-      const result = [];
-
-      // Detect <video> tags and <source>
-      document.querySelectorAll('video').forEach(video => {
-        if (video.src && !seen.has(video.src)) {
-          seen.add(video.src);
-          result.push(video.src);
-        }
-        video.querySelectorAll('source').forEach(source => {
-          if (source.src && !seen.has(source.src)) {
-            seen.add(source.src);
-            result.push(source.src);
-          }
-        });
-      });
-
-      // Detect network requests via performance API
-      const xhrLinks = Array.from(window.performance.getEntriesByType('resource'))
-        .map(r => r.name)
-        .filter(n => n.match(/\.(m3u8|mp4|webm|mpd)(\?|$)/i));
-
-      xhrLinks.forEach(l => {
-        if (!seen.has(l)) {
-          seen.add(l);
-          result.push(l);
-        }
-      });
-
-      return result;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
     });
 
-    await browser.close();
+    const html = await response.text();
 
-    if (!links.length) {
-      return res.status(200).json({ message: 'No media links found on this page.' });
+    const patterns = [
+      /\.m3u8(\?[^"' ]*)?/gi,
+      /\.mp4(\?[^"' ]*)?/gi,
+      /\.webm(\?[^"' ]*)?/gi,
+      /\.mpd(\?[^"' ]*)?/gi,
+    ];
+
+    const found = new Set();
+
+    patterns.forEach((regex) => {
+      const matches = html.match(regex);
+      if (matches) {
+        matches.forEach((m) => found.add(m));
+      }
+    });
+
+    if (found.size === 0) {
+      return res.json({
+        success: false,
+        message: 'No media links found on this page',
+      });
     }
 
-    return res.status(200).json({ links });
-
+    return res.json({
+      success: true,
+      count: found.size,
+      links: Array.from(found),
+    });
   } catch (err) {
-    if (browser) await browser.close();
-    console.error(err);
-    return res.status(500).json({ error: 'Extraction failed.', details: err.message });
+    return res.status(500).json({
+      success: false,
+      error: 'Extraction failed',
+      details: err.message,
+    });
   }
 }
