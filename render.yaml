@@ -8,10 +8,3 @@ services:
     rootDir: backend
     buildCommand: "npm install"
     startCommand: "npm start"
-
-  - type: static
-    name: frontend
-    plan: free
-    repo: https://github.com/allbrightrof/extractor
-    branch: main
-    rootDir: frontend
