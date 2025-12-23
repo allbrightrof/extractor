@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 
 async function extractM3U8(url) {
   // Add --no-sandbox for Render
